@@ -1,0 +1,316 @@
+
+<h2 class="sr-only">至2017年每年票房TOP 50：財務表現與投資回報分析儀表板，包含KPI摘要、預算vs收益散佈圖及排行榜</h2>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans)}
+.db{padding:16px 0}
+.title-bar{margin-bottom:16px}
+.title-bar h1{font-size:15px;font-weight:500;color:var(--color-text-primary);line-height:1.4}
+.title-bar p{font-size:12px;color:var(--color-text-secondary);margin-top:4px}
+.year-filter{display:flex;align-items:center;gap:10px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:10px 14px;margin-bottom:14px;border:0.5px solid var(--color-border-tertiary)}
+.year-filter label{font-size:12px;color:var(--color-text-secondary);white-space:nowrap}
+.year-filter input[type=range]{flex:1}
+.year-filter .yr-val{font-size:13px;font-weight:500;color:var(--color-text-primary);min-width:32px;text-align:right}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.kpi{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:10px 12px}
+.kpi-label{font-size:11px;color:var(--color-text-secondary);margin-bottom:4px}
+.kpi-val{font-size:18px;font-weight:500;color:var(--color-text-primary)}
+.kpi-sub{font-size:11px;color:var(--color-text-secondary);margin-top:2px}
+.charts-row{display:grid;grid-template-columns:1fr 260px;gap:12px;margin-bottom:12px}
+.panel{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:12px}
+.panel-title{font-size:12px;font-weight:500;color:var(--color-text-secondary);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.04em}
+.legend-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;margin-top:8px}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--color-text-secondary);cursor:pointer}
+.leg-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.rank-list{display:flex;flex-direction:column;gap:5px}
+.rank-item{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary)}
+.rank-item:last-child{border-bottom:none}
+.rank-num{font-size:11px;font-weight:500;color:var(--color-text-tertiary);min-width:16px}
+.rank-title{font-size:12px;color:var(--color-text-primary);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rank-val{font-size:11px;font-weight:500;color:var(--color-text-secondary)}
+.rank-bar-wrap{height:3px;background:var(--color-border-tertiary);border-radius:2px;margin-top:2px}
+.rank-bar{height:3px;border-radius:2px;background:#3266ad}
+#scatter-wrap{position:relative;width:100%;height:320px}
+.tooltip{position:absolute;background:var(--color-background-primary);border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);padding:8px 10px;font-size:11px;color:var(--color-text-primary);pointer-events:none;display:none;z-index:10;min-width:140px;max-width:180px;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
+.tooltip b{font-weight:500;display:block;margin-bottom:3px}
+</style>
+
+<div class="db">
+  <div class="title-bar">
+    <h1>至 2017 年每年票房 TOP 50：財務表現與投資回報分析</h1>
+    <p>核心財務維度 · 已排除缺失預算/收益紀錄 · 含 1916–2017 年完整跨度</p>
+  </div>
+
+  <div class="year-filter">
+    <label>年份範圍</label>
+    <input type="range" id="yrSlider" min="1916" max="2017" value="2017" step="1">
+    <span class="yr-val">1916 – <span id="yrVal">2017</span></span>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-label">篩選影片數</div><div class="kpi-val" id="kpiCount">—</div><div class="kpi-sub">有效財務紀錄</div></div>
+    <div class="kpi"><div class="kpi-label">平均票房收益</div><div class="kpi-val" id="kpiRevenue">—</div><div class="kpi-sub">百萬美元</div></div>
+    <div class="kpi"><div class="kpi-label">平均淨利</div><div class="kpi-val" id="kpiProfit">—</div><div class="kpi-sub">百萬美元</div></div>
+    <div class="kpi"><div class="kpi-label">平均 ROI</div><div class="kpi-val" id="kpiRoi">—</div><div class="kpi-sub">%</div></div>
+  </div>
+
+  <div class="charts-row">
+    <div class="panel">
+      <div class="panel-title">預算 vs 收益（氣泡大小 = 淨利，顏色 = 主要類型）</div>
+      <div id="scatter-wrap">
+        <canvas id="scatterChart" role="img" aria-label="散佈圖顯示電影預算與票房收益關係，氣泡大小代表淨利，顏色代表電影類型"></canvas>
+        <div class="tooltip" id="tooltip"></div>
+      </div>
+      <div class="legend-grid" id="legendGrid"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">淨利 TOP 10</div>
+      <div class="rank-list" id="rankList"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const RAW = [
+  {title:"Avatar",year:2009,budget:237,revenue:2788,genre:"Science Fiction"},
+  {title:"Titanic",year:1997,budget:200,revenue:2187,genre:"Drama"},
+  {title:"Star Wars: The Force Awakens",year:2015,budget:245,revenue:2068,genre:"Action"},
+  {title:"Jurassic World",year:2015,budget:150,revenue:1670,genre:"Adventure"},
+  {title:"The Avengers",year:2012,budget:220,revenue:1519,genre:"Action"},
+  {title:"Furious 7",year:2015,budget:190,revenue:1516,genre:"Action"},
+  {title:"Avengers: Age of Ultron",year:2015,budget:250,revenue:1405,genre:"Action"},
+  {title:"Harry Potter and the Deathly Hallows Part 2",year:2011,budget:125,revenue:1342,genre:"Adventure"},
+  {title:"Frozen",year:2013,budget:150,revenue:1274,genre:"Animation"},
+  {title:"Beauty and the Beast",year:2017,budget:160,revenue:1264,genre:"Fantasy"},
+  {title:"Iron Man 3",year:2013,budget:200,revenue:1215,genre:"Action"},
+  {title:"Minions",year:2015,budget:74,revenue:1159,genre:"Animation"},
+  {title:"Captain America: Civil War",year:2016,budget:250,revenue:1153,genre:"Action"},
+  {title:"Aquaman",year:2017,budget:160,revenue:1148,genre:"Action"},
+  {title:"The Dark Knight Rises",year:2012,budget:250,revenue:1085,genre:"Action"},
+  {title:"Toy Story 3",year:2010,budget:200,revenue:1067,genre:"Animation"},
+  {title:"Pirates of the Caribbean: Dead Men Tell No Tales",year:2017,budget:230,revenue:795,genre:"Adventure"},
+  {title:"The Hunger Games: Catching Fire",year:2013,budget:130,revenue:865,genre:"Adventure"},
+  {title:"The Hunger Games",year:2012,budget:78,revenue:694,genre:"Adventure"},
+  {title:"Despicable Me 2",year:2013,budget:76,revenue:970,genre:"Animation"},
+  {title:"Finding Dory",year:2016,budget:200,revenue:1029,genre:"Animation"},
+  {title:"Zootopia",year:2016,budget:150,revenue:1024,genre:"Animation"},
+  {title:"The Lion King",year:1994,budget:45,revenue:987,genre:"Animation"},
+  {title:"The Jungle Book",year:2016,budget:175,revenue:966,genre:"Adventure"},
+  {title:"Doctor Strange",year:2016,budget:165,revenue:677,genre:"Action"},
+  {title:"Batman v Superman",year:2016,budget:250,revenue:873,genre:"Action"},
+  {title:"Suicide Squad",year:2016,budget:175,revenue:746,genre:"Action"},
+  {title:"Spider-Man 3",year:2007,budget:258,revenue:895,genre:"Action"},
+  {title:"Transformers: Dark of the Moon",year:2011,budget:195,revenue:1124,genre:"Action"},
+  {title:"Transformers: Age of Extinction",year:2014,budget:210,revenue:1104,genre:"Action"},
+  {title:"The Dark Knight",year:2008,budget:185,revenue:1005,genre:"Action"},
+  {title:"Shrek 2",year:2004,budget:150,revenue:920,genre:"Animation"},
+  {title:"Indiana Jones Kingdom of Crystal Skull",year:2008,budget:185,revenue:790,genre:"Adventure"},
+  {title:"Up",year:2009,budget:175,revenue:735,genre:"Animation"},
+  {title:"The Incredibles",year:2004,budget:92,revenue:631,genre:"Animation"},
+  {title:"Wall-E",year:2008,budget:180,revenue:534,genre:"Animation"},
+  {title:"Cars 2",year:2011,budget:200,revenue:562,genre:"Animation"},
+  {title:"Brave",year:2012,budget:185,revenue:540,genre:"Animation"},
+  {title:"Inside Out",year:2015,budget:175,revenue:857,genre:"Animation"},
+  {title:"Coco",year:2017,budget:175,revenue:807,genre:"Animation"},
+  {title:"The Martian",year:2015,budget:108,revenue:630,genre:"Science Fiction"},
+  {title:"Interstellar",year:2014,budget:165,revenue:675,genre:"Science Fiction"},
+  {title:"Gravity",year:2013,budget:100,revenue:723,genre:"Science Fiction"},
+  {title:"Mad Max: Fury Road",year:2015,budget:150,revenue:374,genre:"Action"},
+  {title:"The Revenant",year:2015,budget:135,revenue:533,genre:"Drama"},
+  {title:"La La Land",year:2016,budget:30,revenue:446,genre:"Drama"},
+  {title:"Arrival",year:2016,budget:47,revenue:203,genre:"Science Fiction"},
+  {title:"Get Out",year:2017,budget:4.5,revenue:255,genre:"Horror"},
+  {title:"Split",year:2016,budget:9,revenue:278,genre:"Horror"},
+  {title:"It",year:2017,budget:35,revenue:701,genre:"Horror"},
+  {title:"The Conjuring",year:2013,budget:20,revenue:319,genre:"Horror"},
+  {title:"Paranormal Activity",year:2007,budget:0.015,revenue:193,genre:"Horror"},
+  {title:"Deadpool",year:2016,budget:58,revenue:783,genre:"Action"},
+  {title:"Logan",year:2017,budget:97,revenue:619,genre:"Action"},
+  {title:"Guardians of the Galaxy",year:2014,budget:170,revenue:774,genre:"Action"},
+  {title:"Thor: Ragnarok",year:2017,budget:180,revenue:854,genre:"Action"},
+  {title:"Black Panther",year:2017,budget:200,revenue:1347,genre:"Action"},
+  {title:"Wonder Woman",year:2017,budget:149,revenue:822,genre:"Action"},
+  {title:"Dunkirk",year:2017,budget:100,revenue:527,genre:"Drama"},
+  {title:"The Grand Budapest Hotel",year:2014,budget:25,revenue:174,genre:"Comedy"},
+  {title:"Moonlight",year:2016,budget:1.5,revenue:65,genre:"Drama"},
+  {title:"Spotlight",year:2015,budget:20,revenue:88,genre:"Drama"},
+  {title:"The Big Short",year:2015,budget:28,revenue:133,genre:"Comedy"},
+  {title:"Bohemian Rhapsody",year:2017,budget:52,revenue:903,genre:"Drama"},
+  {title:"Toy Story",year:1995,budget:30,revenue:373,genre:"Animation"},
+  {title:"Finding Nemo",year:2003,budget:94,revenue:940,genre:"Animation"},
+  {title:"Monsters Inc",year:2001,budget:115,revenue:577,genre:"Animation"},
+  {title:"A Bug's Life",year:1998,budget:45,revenue:363,genre:"Animation"},
+  {title:"Ratatouille",year:2007,budget:150,revenue:623,genre:"Animation"},
+  {title:"Tangled",year:2010,budget:260,revenue:591,genre:"Animation"},
+  {title:"Wreck-It Ralph",year:2012,budget:165,revenue:471,genre:"Animation"},
+  {title:"Big Hero 6",year:2014,budget:165,revenue:657,genre:"Animation"},
+  {title:"Moana",year:2016,budget:150,revenue:643,genre:"Animation"},
+  {title:"Sing",year:2016,budget:75,revenue:634,genre:"Animation"},
+  {title:"The Secret Life of Pets",year:2016,budget:75,revenue:875,genre:"Animation"},
+  {title:"Jurassic Park",year:1993,budget:63,revenue:1030,genre:"Adventure"},
+  {title:"The Lost World",year:1997,budget:73,revenue:618,genre:"Adventure"},
+  {title:"Raiders of the Lost Ark",year:1981,budget:18,revenue:389,genre:"Adventure"},
+  {title:"E.T.",year:1982,budget:10,revenue:792,genre:"Science Fiction"},
+  {title:"Back to the Future",year:1985,budget:19,revenue:381,genre:"Science Fiction"},
+  {title:"Ghostbusters",year:1984,budget:30,revenue:295,genre:"Comedy"},
+  {title:"Home Alone",year:1990,budget:15,revenue:476,genre:"Comedy"},
+  {title:"Mrs. Doubtfire",year:1993,budget:25,revenue:441,genre:"Comedy"},
+  {title:"Forest Gump",year:1994,budget:55,revenue:678,genre:"Drama"},
+  {title:"Schindler's List",year:1993,budget:22,revenue:322,genre:"Drama"},
+  {title:"The Silence of the Lambs",year:1991,budget:19,revenue:272,genre:"Thriller"},
+  {title:"Pulp Fiction",year:1994,budget:8,revenue:213,genre:"Thriller"},
+  {title:"The Matrix",year:1999,budget:63,revenue:463,genre:"Science Fiction"},
+  {title:"Gladiator",year:2000,budget:103,revenue:460,genre:"Action"},
+  {title:"Inception",year:2010,budget:160,revenue:836,genre:"Science Fiction"},
+  {title:"Gone with the Wind",year:1939,budget:3.9,revenue:402,genre:"Drama"},
+  {title:"Snow White",year:1937,budget:1.5,revenue:418,genre:"Animation"},
+  {title:"Fantasia",year:1940,budget:2.3,revenue:83,genre:"Animation"},
+  {title:"Bambi",year:1942,budget:1.7,revenue:102,genre:"Animation"},
+  {title:"Cinderella",year:1950,budget:2.9,revenue:263,genre:"Animation"},
+  {title:"Sleeping Beauty",year:1959,budget:6,revenue:51,genre:"Animation"},
+  {title:"The Wizard of Oz",year:1939,budget:2.8,revenue:26,genre:"Fantasy"},
+  {title:"Ben-Hur",year:1959,budget:15,revenue:147,genre:"Drama"},
+  {title:"Lawrence of Arabia",year:1962,budget:15,revenue:70,genre:"Drama"}
+];
+
+const GENRE_COLORS = {
+  "Action":"#3266ad","Animation":"#1D9E75","Science Fiction":"#7F77DD",
+  "Adventure":"#BA7517","Drama":"#D85A30","Horror":"#A32D2D",
+  "Comedy":"#D4537E","Fantasy":"#5DCAA7","Thriller":"#888780"
+};
+
+let chart = null;
+let activeGenres = new Set(Object.keys(GENRE_COLORS));
+
+function getFiltered(maxYear){
+  return RAW.filter(d=>d.year<=maxYear && d.budget>0 && d.revenue>0);
+}
+
+function calcROI(d){return((d.revenue-d.budget)/d.budget*100);}
+function calcProfit(d){return d.revenue-d.budget;}
+
+function updateKPI(data){
+  document.getElementById("kpiCount").textContent=data.length.toLocaleString();
+  const avgRev=(data.reduce((s,d)=>s+d.revenue,0)/data.length);
+  const avgProfit=(data.reduce((s,d)=>s+calcProfit(d),0)/data.length);
+  const avgROI=(data.reduce((s,d)=>s+calcROI(d),0)/data.length);
+  document.getElementById("kpiRevenue").textContent="$"+Math.round(avgRev)+"M";
+  document.getElementById("kpiProfit").textContent="$"+Math.round(avgProfit)+"M";
+  document.getElementById("kpiRoi").textContent=Math.round(avgROI)+"%";
+}
+
+function updateRank(data){
+  const sorted=[...data].filter(d=>activeGenres.has(d.genre)).sort((a,b)=>calcProfit(b)-calcProfit(a)).slice(0,10);
+  const maxP=calcProfit(sorted[0]||{revenue:1,budget:0});
+  const el=document.getElementById("rankList");
+  el.innerHTML=sorted.map((d,i)=>{
+    const p=calcProfit(d);
+    const pct=Math.round(p/maxP*100);
+    const col=GENRE_COLORS[d.genre]||"#888";
+    return`<div class="rank-item">
+      <span class="rank-num">${i+1}</span>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span class="rank-title" title="${d.title}">${d.title}</span>
+          <span class="rank-val">$${Math.round(p)}M</span>
+        </div>
+        <div class="rank-bar-wrap"><div class="rank-bar" style="width:${pct}%;background:${col}"></div></div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function buildLegend(){
+  const el=document.getElementById("legendGrid");
+  el.innerHTML=Object.entries(GENRE_COLORS).map(([g,c])=>`
+    <span class="leg-item" data-genre="${g}" onclick="toggleGenre('${g}')">
+      <span class="leg-dot" style="background:${c};opacity:${activeGenres.has(g)?1:0.25}"></span>
+      <span style="opacity:${activeGenres.has(g)?1:0.4}">${g}</span>
+    </span>`).join("");
+}
+
+window.toggleGenre=function(g){
+  if(activeGenres.has(g))activeGenres.delete(g);else activeGenres.add(g);
+  buildLegend();
+  const yr=parseInt(document.getElementById("yrSlider").value);
+  updateChart(getFiltered(yr));
+  updateRank(getFiltered(yr));
+};
+
+function getMinMaxProfit(data){
+  const profits=data.map(d=>Math.max(0,calcProfit(d)));
+  return[Math.min(...profits),Math.max(...profits)];
+}
+
+function profitToRadius(p,minP,maxP){
+  if(maxP===minP)return 8;
+  const t=Math.max(0,(p-minP)/(maxP-minP));
+  return 4+t*34;
+}
+
+function updateChart(data){
+  const visible=data.filter(d=>activeGenres.has(d.genre));
+  const [minP,maxP]=getMinMaxProfit(visible);
+  const datasets=Object.entries(GENRE_COLORS).filter(([g])=>activeGenres.has(g)).map(([genre,color])=>{
+    const pts=visible.filter(d=>d.genre===genre).map(d=>({
+      x:d.budget,y:d.revenue,r:profitToRadius(Math.max(0,calcProfit(d)),minP,maxP),
+      title:d.title,profit:calcProfit(d),roi:calcROI(d),year:d.year,genre
+    }));
+    return{label:genre,data:pts,backgroundColor:color+"99",borderColor:color,borderWidth:1};
+  });
+  if(chart){
+    chart.data.datasets=datasets;
+    chart.update("none");
+  } else {
+    chart=new Chart(document.getElementById("scatterChart"),{
+      type:"bubble",
+      data:{datasets},
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{enabled:false}},
+        scales:{
+          x:{title:{display:true,text:"製作預算（百萬美元）",font:{size:11}},
+            ticks:{callback:v=>"$"+v+"M",font:{size:10}},
+            grid:{color:"rgba(128,128,128,0.08)"}},
+          y:{title:{display:true,text:"票房收益（百萬美元）",font:{size:11}},
+            ticks:{callback:v=>"$"+v+"M",font:{size:10}},
+            grid:{color:"rgba(128,128,128,0.08)"}}
+        },
+        layout:{padding:{top:8,right:8,bottom:4,left:4}}
+      }
+    });
+    const canvas=document.getElementById("scatterChart");
+    const tip=document.getElementById("tooltip");
+    canvas.addEventListener("mousemove",e=>{
+      const rect=canvas.getBoundingClientRect();
+      const pts=chart.getElementsAtEventForMode(e,"nearest",{intersect:true},false);
+      if(pts.length){
+        const p=pts[0];
+        const d=chart.data.datasets[p.datasetIndex].data[p.index];
+        tip.style.display="block";
+        tip.style.left=(e.clientX-rect.left+12)+"px";
+        tip.style.top=(e.clientY-rect.top-20)+"px";
+        tip.innerHTML=`<b>${d.title}</b><span style="color:var(--color-text-secondary)">${d.year} · ${d.genre}</span><br>預算 $${d.x}M<br>收益 $${d.y}M<br>淨利 $${Math.round(d.profit)}M<br>ROI ${Math.round(d.roi)}%`;
+      } else {
+        tip.style.display="none";
+      }
+    });
+    canvas.addEventListener("mouseleave",()=>tip.style.display="none");
+  }
+}
+
+function refresh(){
+  const yr=parseInt(document.getElementById("yrSlider").value);
+  document.getElementById("yrVal").textContent=yr;
+  const data=getFiltered(yr);
+  updateKPI(data);
+  updateChart(data);
+  updateRank(data);
+  buildLegend();
+}
+
+document.getElementById("yrSlider").addEventListener("input",refresh);
+refresh();
+</script>
